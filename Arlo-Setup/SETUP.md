@@ -7,7 +7,7 @@ about 10-15 minutes, most of which is just waiting for downloads.
 
 ## Step 1: Download A.R.L.O.
 
-1. Go to [YOUR GITHUB REPO LINK HERE]
+1. Go to (https://github.com/andrewpareja2013-coder/arlo-assistant/blob/main/Arlo-Setup/SETUP.md)
 2. Click the green "Code" button, then "Download ZIP"
 3. Right-click the downloaded zip and choose "Extract All..."
 4. Choose your Desktop as the destination, then click "Extract"
