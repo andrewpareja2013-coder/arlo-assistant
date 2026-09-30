@@ -23,6 +23,7 @@ def _get_whisper_model():
     if _whisper_model is None:
         if config.TEST_MODE and security.can_see_debug():
             print("Loading speech recognition model...")
+        from faster_whisper import WhisperModel
         _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
     return _whisper_model
 
