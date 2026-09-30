@@ -8,6 +8,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import updater
 import textwrap
 import threading
 import requests
@@ -33,6 +34,7 @@ COMMANDS = {
     "/hub": "(Admin only) View activity across all accounts.",
     "/changepassword": "Change your account password.",
     "/setrole": "(Admin only) Change an account's role.",
+    "/update": "Manually check for and install updates.",
 }
 
 
@@ -61,6 +63,7 @@ def handle_voice_command(command_text):
 # -------------------------------------------------------------
 
 login()
+update_message = updater.check_for_update()
 enable_screen_capture()
 
 memory = Memory()
@@ -74,6 +77,9 @@ if config.TEST_MODE and security.can_see_debug():
 current_time = get_time()
 arlo_says(f"Hello Sir, it is currently {current_time}.")
 print()
+
+if update_message:
+    arlo_says(update_message)
 
 now = datetime.now()
 missed_any = False
@@ -142,6 +148,15 @@ while True:
 
     if user_input == "/hub":
         show_hub(memory)
+        continue
+
+    if user_input == "/update":
+        msg = updater.check_for_update()
+        if msg:
+            arlo_says(msg)
+        else:
+            result = updater.apply_update()
+            arlo_says("Update installed. Please restart A.R.L.O., sir." if result else "No update needed, sir.")
         continue
 
     if user_input == "/changepassword":
