@@ -151,12 +151,12 @@ while True:
         continue
 
     if user_input == "/update":
-        msg = updater.check_for_update()
-        if msg:
-            arlo_says(msg)
+        arlo_says("Installing update...")
+        result = updater.apply_update()
+        if result:
+            arlo_says("Update installed. Please restart A.R.L.O., sir.")
         else:
-            result = updater.apply_update()
-            arlo_says("Update installed. Please restart A.R.L.O., sir." if result else "No update needed, sir.")
+            arlo_says("Unable to install the update, sir.")
         continue
 
     if user_input == "/changepassword":
