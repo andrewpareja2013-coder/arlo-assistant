@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%USERPROFILE%\Downloads"
 
 echo =============================================
 echo   A.R.L.O. Setup
@@ -33,6 +33,10 @@ if errorlevel 1 (
 )
 echo.
 
+echo Installing VS Code Python extension...
+code --install-extension ms-python.python
+echo.
+
 echo Downloading A.R.L.O...
 if not exist "arlo-assistant" (
     powershell -Command "Invoke-WebRequest -Uri 'https://github.com/andrewpareja2013-coder/arlo-assistant/archive/refs/heads/main.zip' -OutFile 'arlo_temp.zip'; Expand-Archive -Path 'arlo_temp.zip' -DestinationPath '.' -Force; Remove-Item 'arlo_temp.zip'"
@@ -41,7 +45,7 @@ if not exist "arlo-assistant" (
 ) else (
     echo A.R.L.O. already present.
 )
-cd arlo-assistant
+cd "arlo-assistant\A.R.L.O PRODUCTION VERSION"
 echo.
 
 echo Installing required Python packages...
