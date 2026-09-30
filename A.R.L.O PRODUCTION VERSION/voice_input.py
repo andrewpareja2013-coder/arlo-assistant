@@ -8,7 +8,6 @@ import os
 import subprocess
 import sounddevice as sd
 import numpy as np
-from faster_whisper import WhisperModel
 import config
 import security
 
