@@ -1,17 +1,17 @@
 # =============================================================
 # UI.PY
 # Terminal display helpers: the assistant's reply prefix, loading
-# animations (spinner and dots), cursor visibility control, and
-# the screen-capture mechanism /hub uses to restore the exact
-# prior screen.
+# animations (spinner and dots), cursor visibility control, visual
+# dividers, and the screen-capture mechanism /hub uses to restore
+# the exact prior screen.
 # =============================================================
 
 import sys
 import io
-import config
 import itertools
 import threading
 import time as time_module
+import config
 
 
 class _TeeOutput:
@@ -46,7 +46,11 @@ def enable_screen_capture():
 
 
 def arlo_says(text):
-    print(f"({config.WAKE_KEYWORD.upper()}) {text}")
+    print(f"[{config.WAKE_KEYWORD.upper()}] {text}")
+
+
+def print_divider():
+    print("~" * 60)
 
 
 def run_with_spinner(func, message="Loading"):
