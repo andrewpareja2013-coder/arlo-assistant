@@ -1,6 +1,6 @@
 # =============================================================
 # PASSWORD_BANK_TOOL.PY
-# Stores and retrieves saved credentials, encrypted using the
+# Stores and retrieves saved credentials, encrypted with the
 # account's own master key before ever being sent to the server.
 # The server only ever sees ciphertext, never real passwords.
 # =============================================================
@@ -13,14 +13,22 @@ import security
 from tools.registry import register
 
 
+def _fetch_entries():
+    response = requests.get(
+        f"{config.API_BASE}/get-passwords",
+        params={"account_id": security.get_current_account_id()},
+        timeout=10,
+    )
+    return response.json().get("passwords", [])
+
+
 def add_password(service, username_for_service, password_value):
     fernet = Fernet(security.get_master_key())
     data = json.dumps({"username": username_for_service, "password": password_value})
     encrypted = fernet.encrypt(data.encode()).decode()
 
-    current_user = security.get_current_username()
     requests.post(f"{config.API_BASE}/save-password", json={
-        "username": current_user,
+        "account_id": security.get_current_account_id(),
         "service": service,
         "encrypted_data": encrypted,
     }, timeout=10)
@@ -29,16 +37,11 @@ def add_password(service, username_for_service, password_value):
 
 
 def get_password(service):
-    current_user = security.get_current_username()
-    response = requests.get(f"{config.API_BASE}/get-passwords", params={"username": current_user}, timeout=10)
-    passwords = response.json().get("passwords", [])
-
     fernet = Fernet(security.get_master_key())
     matches = []
-    for entry in passwords:
+    for entry in _fetch_entries():
         if entry["service"].lower() == service.lower():
-            decrypted = fernet.decrypt(entry["encrypted_data"].encode()).decode()
-            data = json.loads(decrypted)
+            data = json.loads(fernet.decrypt(entry["encrypted_data"].encode()).decode())
             matches.append(f"Username: {data['username']}, Password: {data['password']}")
 
     if not matches:
@@ -49,11 +52,7 @@ def get_password(service):
 
 
 def delete_password(service):
-    current_user = security.get_current_username()
-    response = requests.get(f"{config.API_BASE}/get-passwords", params={"username": current_user}, timeout=10)
-    passwords = response.json().get("passwords", [])
-
-    matches = [p for p in passwords if p["service"].lower() == service.lower()]
+    matches = [p for p in _fetch_entries() if p["service"].lower() == service.lower()]
 
     if not matches:
         return f"I don't have any credentials saved for {service}, sir."
@@ -65,18 +64,14 @@ def delete_password(service):
 
 
 def list_password_services():
-    current_user = security.get_current_username()
-    response = requests.get(f"{config.API_BASE}/get-passwords", params={"username": current_user}, timeout=10)
-    passwords = response.json().get("passwords", [])
-
-    if not passwords:
+    entries = _fetch_entries()
+    if not entries:
         return "You have no saved credentials, sir."
 
     fernet = Fernet(security.get_master_key())
     lines = []
-    for entry in passwords:
-        decrypted = fernet.decrypt(entry["encrypted_data"].encode()).decode()
-        data = json.loads(decrypted)
+    for entry in entries:
+        data = json.loads(fernet.decrypt(entry["encrypted_data"].encode()).decode())
         lines.append(f"{entry['service']} -- {data['username']}")
 
     return "Saved credentials:\n" + "\n".join(lines)

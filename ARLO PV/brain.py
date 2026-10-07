@@ -56,7 +56,6 @@ def build_system_prompt(memory):
         config.SYSTEM_PERSONALITY
         + f" It is currently the {greeting_word}, so greet the user accordingly if greeting them."
         + f" Today's real date is {today}. Use this to correctly judge whether events are in the past or future."
-        + f" Users may address you by name, '{config.WAKE_KEYWORD.capitalize()}' -- recognize this as referring to you, whether typed or spoken."
         + long_term
         + " CRITICAL: If you need to retry a command or use a different tool after an error, you MUST use a proper tool call, never write out tool call syntax as plain text in your response. If you write something like '<tool_call>' as text, that is a serious error -- always use the actual tool-calling mechanism instead."
         + " CRITICAL: When reporting a time (from get_time, alarms, etc.), you MUST state it EXACTLY as given by the tool, character for character. NEVER convert between 12-hour and 24-hour format, NEVER add or remove AM/PM, NEVER rephrase it descriptively. Example: if the tool returns '08:39 PM', your answer must contain the literal text '08:39 PM' -- not '20:39', not '8:39pm', not any variation."
@@ -136,8 +135,8 @@ def run_tool(tool_name, tool_input, memory):
 
 
 def get_reply(user_message, memory):
-    username = security.get_current_username()
-    usage_check = requests.get(f"{config.API_BASE}/check-usage", params={"username": username}, timeout=10).json()
+    account_id = memory.account_id
+    usage_check = requests.get(f"{config.API_BASE}/check-usage", params={"account_id": account_id}, timeout=10).json()
 
     if not usage_check.get("allowed", True):
         return "I'm sorry sir, you've reached your daily usage limit. Please try again tomorrow."
@@ -191,7 +190,7 @@ def get_reply(user_message, memory):
 
     memory.add_message("assistant", reply_text)
 
-    requests.post(f"{config.API_BASE}/add-usage", json={"username": username, "amount": total_usage}, timeout=10)
+    requests.post(f"{config.API_BASE}/add-usage", json={"account_id": account_id, "amount": total_usage}, timeout=10)
 
     return reply_text
 
@@ -212,8 +211,7 @@ def update_long_term_memory(memory):
     )
     try:
         message, used = _call_ai([{"role": "user", "content": prompt}])
-        username = security.get_current_username()
-        requests.post(f"{config.API_BASE}/add-usage", json={"username": username, "amount": used}, timeout=10)
+        requests.post(f"{config.API_BASE}/add-usage", json={"account_id": memory.account_id, "amount": used}, timeout=10)
     except Exception as e:
         report_error("E001", str(e))
         return

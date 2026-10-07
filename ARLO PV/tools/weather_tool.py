@@ -12,25 +12,27 @@ from tools.registry import register
 
 
 def _get_location():
-    """Auto-detects lat/lon via IP, saves it as fallback, or uses the last known good reading."""
+    """Auto-detects lat/lon via IP and saves it, or uses the last saved reading.
+    Returns (None, None) if there is neither."""
     try:
         response = requests.get("http://ip-api.com/json/", timeout=5)
         data = response.json()
         lat, lon = data["lat"], data["lon"]
-        username = security.get_current_username()
-        security.save_setting(username, "last_known_lat", lat)
-        security.save_setting(username, "last_known_lon", lon)
+        security.save_setting("last_known_lat", lat)
+        security.save_setting("last_known_lon", lon)
         return lat, lon
     except Exception:
-        username = security.get_current_username()
-        lat = security.get_setting(username, "last_known_lat", config.FALLBACK_LATITUDE)
-        lon = security.get_setting(username, "last_known_lon", config.FALLBACK_LONGITUDE)
+        lat = security.get_setting("last_known_lat", config.FALLBACK_LATITUDE)
+        lon = security.get_setting("last_known_lon", config.FALLBACK_LONGITUDE)
         return lat, lon
 
 
 def get_weather():
     lat, lon = _get_location()
-    unit = security.get_setting(security.get_current_username(), "temperature_unit", "fahrenheit")
+    if lat is None or lon is None:
+        return "I couldn't work out your location, sir, so I can't check the weather right now."
+
+    unit = security.get_setting("temperature_unit", "fahrenheit")
 
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"

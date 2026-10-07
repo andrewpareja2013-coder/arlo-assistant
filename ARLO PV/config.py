@@ -9,6 +9,7 @@ API_BASE = "https://arlo-backend.andrewpareja2013.workers.dev"
 
 # --- Voice ---
 VOICE_ENABLED = False  # Set to True to enable wake-word voice commands
+MICROPHONE_DEVICE = None   # None = system default; set to a device number to pick a specific microphone
 
 # --- Wake word / Name ---
 # Changing this changes the assistant's name everywhere: voice wake-word
@@ -31,7 +32,6 @@ KNOWN_APPS = {
 }
 
 APP_ALIASES = {
-    "google": "chrome",
 }
 
 # --- Known Websites ---
@@ -46,5 +46,6 @@ ROUTINES = {
 FALLBACK_LATITUDE = None
 FALLBACK_LONGITUDE = None
 
-# --- Test Mode ---
-TEST_MODE = False   # When True, debug print statements are shown throughout the program
+# --- Updates ---
+CHECK_FOR_UPDATES = True
+TEST_MODE = False

@@ -1,47 +1,55 @@
 # =============================================================
 # HUB.PY
-# Admin-only overview: cross-account activity and memory, shown
-# as a temporary overlay that restores the exact prior screen.
+# Admin-only overview shown as a temporary overlay that restores the
+# exact prior screen on exit. With the admin secret it lists every
+# account (name + code) and their activity; without it, only your own.
 # =============================================================
 
 import sys
 import os
 import io
-import json
-import base64
 import requests
 import config
 import security
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from ui import arlo_says
 
 
-def _derive_admin_key(admin_secret):
-    salt = b"arlo-admin-salt-fixed"
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=100000)
-    return kdf.derive(admin_secret.encode())
+def _clear():
+    os.system("cls" if os.name == "nt" else "clear")
 
 
-def _decrypt_admin_master_key(admin_locked_b64, admin_secret):
-    key = _derive_admin_key(admin_secret)
-    raw = base64.b64decode(admin_locked_b64)
-    iv, ciphertext = raw[:12], raw[12:]
-    aesgcm = AESGCM(key)
-    return aesgcm.decrypt(iv, ciphertext, None).decode()
+def _load_accounts(admin_secret):
+    """Returns (accounts, note). Without a valid admin secret, only the current account is returned."""
+    own = [{
+        "id": security.get_current_account_id(),
+        "username": security.get_current_username(),
+        "role": security.get_role(),
+    }]
+    if not admin_secret:
+        return own, "Showing your own account only. Enter the admin secret to see every account."
+    try:
+        response = requests.get(
+            f"{config.API_BASE}/admin-list-accounts",
+            headers={"X-Admin-Secret": admin_secret},
+            timeout=10,
+        )
+        data = response.json()
+    except Exception:
+        return own, "Couldn't reach the server. Showing your own account only."
+    if not data.get("success"):
+        return own, "Incorrect admin secret. Showing your own account only."
+    return data["accounts"], None
 
 
 def show_hub(memory):
-    """Admin-only: displays activity and memory across ALL accounts."""
+    """Admin-only: shows activity for the accounts the admin secret unlocks."""
     if not security.is_admin():
         arlo_says("The HUB is restricted to admin accounts only, sir.")
         return
 
     pre_hub_snapshot = sys.stdout.buffer.getvalue()
 
-    os.system("cls" if os.name == "nt" else "clear")
+    _clear()
 
     width = 40
     title = f"{config.WAKE_KEYWORD.upper()} HUB (Admin)"
@@ -49,39 +57,38 @@ def show_hub(memory):
     print("║" + title.center(width) + "║")
     print("╚" + "═" * width + "╝\n")
 
-    admin_secret = input("Admin secret (to view decrypted memory, or Enter to skip): ").strip()
+    admin_secret = input("Admin secret (Enter to skip and see only your own account): ").strip()
+    accounts, note = _load_accounts(admin_secret)
 
-    accounts = security.list_accounts()
-    print(f"\n── All Accounts ({len(accounts)}) ──")
+    print(f"\n── Accounts ({len(accounts)}) ──")
+    if note:
+        print(f"  {note}")
     for acct in accounts:
-        print(f"  {acct}")
+        print(f"  {acct['username']}  [{security.format_code(acct['id'])}]  ({acct.get('role', '?')})")
     print()
 
     print("── Activity by Account ──")
     for acct in accounts:
-        response = requests.get(f"{config.API_BASE}/get-transcript", params={"username": acct}, timeout=10)
-        transcript = response.json().get("transcript", [])
-        print(f"\n  {acct} -- {len(transcript)} total messages")
+        try:
+            transcript = requests.get(
+                f"{config.API_BASE}/get-transcript", params={"account_id": acct["id"]}, timeout=10
+            ).json().get("transcript", [])
+            summary = requests.get(
+                f"{config.API_BASE}/get-memory", params={"account_id": acct["id"]}, timeout=10
+            ).json().get("summary", "")
+        except Exception:
+            print(f"\n  {acct['username']} -- couldn't load activity")
+            continue
+
+        print(f"\n  {acct['username']} -- {len(transcript)} total messages")
         for msg in transcript[-3:]:
             print(f"    [{msg['role']}] {msg['content'][:60]}")
-
-        if admin_secret:
-            admin_response = requests.get(
-                f"{config.API_BASE}/admin-get-account",
-                params={"username": acct},
-                headers={"X-Admin-Secret": admin_secret},
-                timeout=10,
-            )
-            admin_data = admin_response.json()
-            if admin_data.get("success"):
-                summary_response = requests.get(f"{config.API_BASE}/get-memory", params={"username": acct}, timeout=10)
-                summary = summary_response.json().get("summary", "")
-                if summary:
-                    print(f"    Memory summary: {summary[:150]}")
+        if summary:
+            print(f"    Memory summary: {summary[:150]}")
     print()
 
     input("\nPress Enter to return...")
-    os.system("cls" if os.name == "nt" else "clear")
+    _clear()
     sys.stdout.real_stdout.write(pre_hub_snapshot)
     sys.stdout.real_stdout.flush()
     sys.stdout.buffer = io.StringIO(pre_hub_snapshot)

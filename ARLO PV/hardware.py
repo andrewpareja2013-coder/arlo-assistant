@@ -33,7 +33,7 @@ def _fetch_hardware_data_linux():
 
 
 def _detect_is_intel():
-    """Checks /proc/cpuinfo on Linux, or sensor names on Windows, to guess CPU vendor."""
+    """Checks /proc/cpuinfo on Linux, or sensor names on Windows, to guess the CPU vendor."""
     if os.name == "nt":
         try:
             data = asyncio.run(_fetch_hardware_data_windows())
@@ -51,9 +51,8 @@ def _detect_is_intel():
 
 def detect_and_save_thresholds():
     """Checks if this account already has saved thresholds; if not, detects hardware and picks reasonable safe limits."""
-    username = security.get_current_username()
-    existing_cpu = security.get_setting(username, "cpu_temp_warn", None)
-    existing_gpu = security.get_setting(username, "gpu_temp_warn", None)
+    existing_cpu = security.get_setting("cpu_temp_warn", None)
+    existing_gpu = security.get_setting("gpu_temp_warn", None)
 
     if existing_cpu is not None and existing_gpu is not None:
         return
@@ -62,18 +61,16 @@ def detect_and_save_thresholds():
     cpu_warn = 95 if is_intel else 90
     gpu_warn = 90
 
-    security.save_setting(username, "cpu_temp_warn", cpu_warn)
-    security.save_setting(username, "gpu_temp_warn", gpu_warn)
+    security.save_setting("cpu_temp_warn", cpu_warn)
+    security.save_setting("gpu_temp_warn", gpu_warn)
 
 
 def get_cpu_temp_warn():
-    value = security.get_setting(security.get_current_username(), "cpu_temp_warn", 90)
-    return float(value)
+    return float(security.get_setting("cpu_temp_warn", 90))
 
 
 def get_gpu_temp_warn():
-    value = security.get_setting(security.get_current_username(), "gpu_temp_warn", 85)
-    return float(value)
+    return float(security.get_setting("gpu_temp_warn", 85))
 
 
 def is_lhm_running():

@@ -2,6 +2,7 @@
 # FILE_SEARCH_TOOL.PY
 # Searches the user's PC for files or folders by name, matching
 # any/all words in the search term regardless of order.
+# Searches the current user's home folder.
 # =============================================================
 
 import os
@@ -9,7 +10,7 @@ from tools.registry import register
 
 
 def search_files(filename):
-    search_path = "C:\\Users\\apareja"
+    search_path = os.path.expanduser("~")
     search_words = filename.lower().split()
     matches = []
 

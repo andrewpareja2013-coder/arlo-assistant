@@ -1,5 +1,5 @@
 {
-  "version": "1.2.2",
-  "force": false,
-  "notes": "Chat display polish and /logout."
+  "version": "1.2.3",
+  "force": true,
+  "notes": "Account codes, update check before login, updater keeps your settings."
 }

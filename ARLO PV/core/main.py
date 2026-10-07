@@ -30,6 +30,7 @@ from hub import show_hub
 COMMANDS = {
     "/help": "List all available commands.",
     "/hub": "(Admin only) View activity across all accounts.",
+    "/mycode": "Show your account code (needed to add this account on another device).",
     "/changepassword": "Change your account password.",
     "/setrole": "(Admin only) Change an account's role.",
     "/update": "Manually check for and install updates.",
@@ -71,9 +72,14 @@ def handle_voice_command(command_text, memory, speak):
 
 
 def run_session():
-    """Runs one full login -> chat session. Returns 'exit' or 'logout'."""
+    """Runs one full update check -> login -> chat session. Returns 'exit' or 'logout'."""
+    update_message, restart_needed = updater.check_for_update()
+    if restart_needed:
+        print(update_message)
+        input("Press Enter to close A.R.L.O....")
+        return "exit"
+
     login()
-    update_message = updater.check_for_update()
     enable_screen_capture()
 
     stop_event = threading.Event()  # tells this session's background threads to stop when it ends
@@ -178,13 +184,21 @@ def run_session():
             show_hub(memory)
             continue
 
+        if user_input == "/mycode":
+            arlo_says(f"Your account code is {security.format_code(memory.account_id)}.")
+            arlo_says("Keep it private. You need it to add this account on another device.")
+            print_divider()
+            continue
+
         if user_input == "/update":
-            arlo_says("Installing update...")
-            result = updater.apply_update()
-            if result:
-                arlo_says("Update installed. Please restart A.R.L.O., sir.")
+            if not updater.updates_enabled():
+                arlo_says("Updates are turned off on this copy, sir. Set CHECK_FOR_UPDATES = True in config.py to turn them back on.")
             else:
-                arlo_says("Unable to install the update, sir.")
+                arlo_says("Installing update...")
+                if updater.apply_update():
+                    arlo_says("Update installed. Please restart A.R.L.O., sir.")
+                else:
+                    arlo_says("Unable to install the update, sir.")
             print_divider()
             continue
 
@@ -194,7 +208,7 @@ def run_session():
             confirm = input("Confirm new password: ")
             if new != confirm:
                 arlo_says("New passwords didn't match, sir.")
-            elif security.change_password(security.get_current_username(), old, new):
+            elif security.change_password(memory.account_id, old, new):
                 arlo_says("Password changed successfully, sir.")
             else:
                 arlo_says("That current password was incorrect, sir.")
@@ -202,7 +216,7 @@ def run_session():
             continue
 
         if user_input == "/setrole":
-            target = input("Username to change: ").strip()
+            target = input("Account code or username to change: ").strip()
             new_role = input("New role (admin/tester/regular): ").strip().lower()
             admin_code = input("Admin code: ").strip()
             success, error = security.set_role(target, new_role, admin_code)

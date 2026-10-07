@@ -2,6 +2,8 @@
 # TIME_TOOL.PY
 # Handles all time-related abilities: current time/date, greetings,
 # alarms (set/list/cancel), and time-until calculations.
+# Time format (12-hour vs 24-hour) is a per-account setting.
+# Alarms are stored on the live backend under the account code.
 # =============================================================
 
 from datetime import datetime, timedelta
@@ -12,7 +14,7 @@ from tools.registry import register
 
 
 def _uses_military_time():
-    return security.get_setting(security.get_current_username(), "military_time", False)
+    return security.get_setting("military_time", False)
 
 
 def _match_alarm(memory, description):
@@ -81,10 +83,9 @@ def set_alarm(memory, minutes_from_now=None, seconds_from_now=None, clock_time=N
     else:
         return "I need a duration or a specific time to set an alarm, sir."
 
-    username = security.get_current_username()
     response = requests.post(
         f"{config.API_BASE}/save-alarm",
-        json={"username": username, "fire_time": fire_time.isoformat(), "description": description},
+        json={"account_id": memory.account_id, "fire_time": fire_time.isoformat(), "description": description},
         timeout=10,
     )
     new_id = response.json().get("id")
