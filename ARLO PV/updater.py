@@ -20,7 +20,7 @@ import requests
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_VERSION_FILE = os.path.join(BASE_DIR, "version.json")
 LOCAL_CONFIG_FILE = os.path.join(BASE_DIR, "config.py")
-REMOTE_VERSION_URL = "https://raw.githubusercontent.com/andrewpareja2013-coder/arlo-assistant/main/A.R.L.O%20PRODUCTION%20VERSION/version.json"
+REMOTE_VERSION_URL = "https://raw.githubusercontent.com/andrewpareja2013-coder/arlo-assistant/main/ARLO%20PV/version.json"
 REPO_ZIP_URL = "https://github.com/andrewpareja2013-coder/arlo-assistant/archive/refs/heads/main.zip"
 
 # Settings in config.py that belong to whoever uses this copy. An update keeps their values for
@@ -157,7 +157,7 @@ def apply_update():
         if os.path.exists(extract_path):
             shutil.rmtree(extract_path)
         zipfile.ZipFile(io.BytesIO(response.content)).extractall(extract_path)
-        extracted_root = os.path.join(extract_path, "arlo-assistant-main", "A.R.L.O PRODUCTION VERSION")
+        extracted_root = os.path.join(extract_path, "arlo-assistant-main", "ARLO PV")
 
         saved = _read_saved_settings()
         if os.path.exists(LOCAL_CONFIG_FILE):
