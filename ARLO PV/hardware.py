@@ -81,6 +81,24 @@ def is_lhm_running():
     return False
 
 
+def _start_lhm_task():
+    """Windows only: starts LibreHardwareMonitor through the scheduled task the installer made.
+    The task runs with admin rights, so Windows doesn't show a permission prompt.
+    Returns True if the task was started."""
+    try:
+        result = subprocess.run(
+            ["schtasks", "/run", "/tn", "ARLO LibreHardwareMonitor"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def ensure_lhm_running():
     """Windows only: launches LibreHardwareMonitor silently if it's not already running."""
     if os.name != "nt":
@@ -90,6 +108,11 @@ def ensure_lhm_running():
     if not os.path.exists(LHM_PATH):
         return
 
+    # Preferred: the scheduled task (no permission prompt)
+    if _start_lhm_task():
+        return
+
+    # Fallback (no task, like on a dev copy): launch it directly, Windows may ask for permission
     try:
         subprocess.Popen(
             LHM_PATH,

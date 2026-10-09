@@ -29,23 +29,36 @@ SYSTEM_PERSONALITY = (
 
 # --- Known Applications ---
 KNOWN_APPS = {
+    "notepad":       {"open": "notepad.exe",        "close": "notepad.exe"},
+    "chrome":        {"open": r"C:\Program Files\Google\Chrome\Application\chrome.exe",          "close": "chrome.exe"},
+    "calculator":    {"open": "calc.exe",            "close": "CalculatorApp.exe"},
+    "discord":       {"open": r"C:\Users\apareja\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Discord.lnk", "close": "Discord.exe"},
+    "steam":         {"open": r"C:\Program Files (x86)\Steam\steam.exe", "close": "steam.exe"},
+    "task manager":  {"open": "taskmgr.exe",         "close": "Taskmgr.exe"},
+    "file explorer": {"open": "explorer.exe",        "close": "explorer.exe"},
+    "paint":         {"open": "mspaint.exe",         "close": "mspaint.exe"},
+    "roblox":        {"open": r"C:\Users\apareja\Desktop\Roblox Player.lnk", "close": "Roblox Player.lnk"},
 }
 
 APP_ALIASES = {
+    "google": "chrome",
 }
 
 # --- Known Websites ---
 KNOWN_WEBSITES = {
+    "spotify": "https://open.spotify.com",
 }
 
 # --- Routines ---
 ROUTINES = {
+    "work":   {"apps": ["chrome", "discord"], "websites": []},
+    "gaming": {"apps": ["steam", "discord"],  "websites": ["spotify"]},
 }
 
 # --- Weather fallback (used only if IP-based location lookup fails) ---
-FALLBACK_LATITUDE = None
-FALLBACK_LONGITUDE = None
+FALLBACK_LATITUDE = 27.9378
+FALLBACK_LONGITUDE = -82.2859
 
 # --- Updates ---
-CHECK_FOR_UPDATES = True
-TEST_MODE = False
+CHECK_FOR_UPDATES = False
+TEST_MODE = True
