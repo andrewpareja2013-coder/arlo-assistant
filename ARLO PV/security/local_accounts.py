@@ -5,7 +5,7 @@
 # local convenience -- adding or removing here never touches the
 # real account or its data.
 # An old list that only holds usernames is converted once, by asking
-# the server which account has each name (temporary, removed in 1.2.4).
+# the server which account has each name (temporary, removed in 1.2.5).
 # =============================================================
 
 import os
@@ -21,7 +21,7 @@ def _read_file():
     if not os.path.exists(LOCAL_LIST_FILE):
         return []
     try:
-        with open(LOCAL_LIST_FILE) as f:
+        with open(LOCAL_LIST_FILE, encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
         return []
@@ -29,8 +29,17 @@ def _read_file():
 
 
 def _write_file(accounts):
-    with open(LOCAL_LIST_FILE, "w") as f:
-        json.dump(accounts, f, indent=2)
+    """Writes to a temporary file first, then swaps it in, so a crash can't leave a half-written list."""
+    temp_file = LOCAL_LIST_FILE + ".tmp"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(accounts, f, indent=2)
+        os.replace(temp_file, LOCAL_LIST_FILE)
+    except Exception:
+        try:
+            os.remove(temp_file)
+        except Exception:
+            pass
 
 
 def _lookup_code_by_name(name):

@@ -19,14 +19,19 @@ class _TeeOutput:
     so the exact screen contents can be restored later (used by /hub)."""
     def __init__(self, real_stdout):
         self.real_stdout = real_stdout
-        self.buffer = io.StringIO()
+        self.captured = io.StringIO()
 
     def write(self, text):
         self.real_stdout.write(text)
-        self.buffer.write(text)
+        self.captured.write(text)
+        return len(text)
 
     def flush(self):
         self.real_stdout.flush()
+
+    def __getattr__(self, name):
+        # Anything not defined here (isatty, encoding, fileno, buffer...) comes from the real stdout
+        return getattr(self.real_stdout, name)
 
 
 def _hide_cursor():
@@ -42,7 +47,8 @@ def _show_cursor():
 def enable_screen_capture():
     """Replaces sys.stdout with a tee that records everything printed from
     this point on. Call once, right after login succeeds."""
-    sys.stdout = _TeeOutput(sys.stdout)
+    if not isinstance(sys.stdout, _TeeOutput):
+        sys.stdout = _TeeOutput(sys.stdout)
 
 
 def arlo_says(text):
@@ -71,12 +77,12 @@ def run_with_spinner(func, message="Loading"):
     spinner_thread = threading.Thread(target=spin, daemon=True)
     spinner_thread.start()
 
-    result = func()
-
-    done.set()
-    spinner_thread.join()
-    _show_cursor()
-    return result
+    try:
+        return func()
+    finally:
+        done.set()
+        spinner_thread.join()
+        _show_cursor()
 
 
 def run_with_dots(func, message="Saving session"):
@@ -98,9 +104,9 @@ def run_with_dots(func, message="Saving session"):
     dots_thread = threading.Thread(target=animate, daemon=True)
     dots_thread.start()
 
-    result = func()
-
-    done.set()
-    dots_thread.join()
-    _show_cursor()
-    return result
+    try:
+        return func()
+    finally:
+        done.set()
+        dots_thread.join()
+        _show_cursor()

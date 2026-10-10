@@ -14,31 +14,40 @@ from tools.registry import register
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.py")
 
 
+def _exe_name(path):
+    """The file name at the end of a path, for Windows or Linux style paths."""
+    return os.path.basename(str(path).replace("\\", "/"))
+
+
 def _save_app_to_config(app_name, path):
-    """Inserts a new entry into config.py's KNOWN_APPS dictionary, right before its closing brace."""
-    with open(CONFIG_FILE, "r") as f:
-        lines = f.readlines()
+    """Inserts a new entry into config.py's KNOWN_APPS dictionary, right before its closing brace.
+    Returns False if it couldn't be saved (the app still works for this session)."""
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
 
-    exe_name = path.split("\\")[-1]
-    new_line = f'    {app_name!r}: {{"open": {path!r}, "close": {exe_name!r}}},\n'
+        new_line = f'    {app_name!r}: {{"open": {path!r}, "close": {_exe_name(path)!r}}},\n'
 
-    in_known_apps = False
-    insert_index = None
+        in_known_apps = False
+        insert_index = None
 
-    for i, line in enumerate(lines):
-        if line.strip().startswith("KNOWN_APPS = {"):
-            in_known_apps = True
-            continue
-        if in_known_apps and line.strip() == "}":
-            insert_index = i
-            break
+        for i, line in enumerate(lines):
+            if line.strip().startswith("KNOWN_APPS = {"):
+                in_known_apps = True
+                continue
+            if in_known_apps and line.strip() == "}":
+                insert_index = i
+                break
 
-    if insert_index is not None:
+        if insert_index is None:
+            return False
+
         lines.insert(insert_index, new_line)
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             f.writelines(lines)
         return True
-    return False
+    except Exception:
+        return False
 
 
 def _search_desktop(app_name):
@@ -69,11 +78,16 @@ def open_app(app_name):
         matches = _search_desktop(app_name)
         if matches:
             found_path = matches[0]
-            config.KNOWN_APPS[app_name] = {"open": found_path, "close": found_path.split("\\")[-1]}
+            config.KNOWN_APPS[app_name] = {"open": found_path, "close": _exe_name(found_path)}
             _save_app_to_config(app_name, found_path)
             program = found_path
         else:
             return f"NEEDS_APP_PATH:{app_name}"
+
+    if os.name == "nt":
+        extra = {"creationflags": subprocess.DETACHED_PROCESS}
+    else:
+        extra = {"start_new_session": True}
 
     try:
         subprocess.Popen(
@@ -82,7 +96,7 @@ def open_app(app_name):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            creationflags=subprocess.DETACHED_PROCESS
+            **extra,
         )
         return f"Opening {app_name}, sir."
     except Exception:
@@ -107,7 +121,8 @@ def close_app(app_name):
 
 
 def add_and_open_app(app_name, path):
-    config.KNOWN_APPS[app_name] = {"open": path, "close": path.split("\\")[-1]}
+    path = str(path).strip().strip('"').strip("'")
+    config.KNOWN_APPS[app_name] = {"open": path, "close": _exe_name(path)}
     _save_app_to_config(app_name, path)
     return open_app(app_name)
 

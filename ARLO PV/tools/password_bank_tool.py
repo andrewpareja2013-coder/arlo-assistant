@@ -12,67 +12,139 @@ import config
 import security
 from tools.registry import register
 
+CONNECTION_ERROR = "I couldn't reach the password bank, sir. Please check the connection and try again."
+LOCKED_ERROR = "I couldn't unlock the password bank, sir."
+
+
+def _get_fernet():
+    """Returns a Fernet for the account's master key, or None if it isn't available."""
+    try:
+        key = security.get_master_key()
+        return Fernet(key) if key else None
+    except Exception:
+        return None
+
+
+def _decrypt(fernet, entry):
+    """Returns the decrypted entry as a dict, or None if it can't be read."""
+    try:
+        return json.loads(fernet.decrypt(entry["encrypted_data"].encode()).decode())
+    except Exception:
+        return None
+
 
 def _fetch_entries():
-    response = requests.get(
-        f"{config.API_BASE}/get-passwords",
-        params={"account_id": security.get_current_account_id()},
-        timeout=10,
-    )
-    return response.json().get("passwords", [])
+    """Returns the list of saved entries, or None if the server couldn't be reached."""
+    try:
+        response = requests.get(
+            f"{config.API_BASE}/get-passwords",
+            params={"account_id": security.get_current_account_id()},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json().get("passwords", [])
+    except Exception:
+        return None
+
+
+def _post(path, payload):
+    """Sends a request to the server. Returns True only if the server accepted it."""
+    try:
+        response = requests.post(f"{config.API_BASE}{path}", json=payload, timeout=10)
+        response.raise_for_status()
+        try:
+            return bool(response.json().get("success", True))
+        except ValueError:
+            return True
+    except Exception:
+        return False
 
 
 def add_password(service, username_for_service, password_value):
-    fernet = Fernet(security.get_master_key())
+    fernet = _get_fernet()
+    if fernet is None:
+        return LOCKED_ERROR
+
     data = json.dumps({"username": username_for_service, "password": password_value})
     encrypted = fernet.encrypt(data.encode()).decode()
 
-    requests.post(f"{config.API_BASE}/save-password", json={
+    saved = _post("/save-password", {
         "account_id": security.get_current_account_id(),
         "service": service,
         "encrypted_data": encrypted,
-    }, timeout=10)
+    })
+    if not saved:
+        return f"I couldn't save the credentials for {service}, sir. Please try again."
 
     return f"Saved credentials for {service}, sir."
 
 
 def get_password(service):
-    fernet = Fernet(security.get_master_key())
+    fernet = _get_fernet()
+    if fernet is None:
+        return LOCKED_ERROR
+
+    entries = _fetch_entries()
+    if entries is None:
+        return CONNECTION_ERROR
+
     matches = []
-    for entry in _fetch_entries():
+    unreadable = 0
+    for entry in entries:
         if entry["service"].lower() == service.lower():
-            data = json.loads(fernet.decrypt(entry["encrypted_data"].encode()).decode())
-            matches.append(f"Username: {data['username']}, Password: {data['password']}")
+            data = _decrypt(fernet, entry)
+            if data is None:
+                unreadable += 1
+            else:
+                matches.append(f"Username: {data['username']}, Password: {data['password']}")
 
     if not matches:
+        if unreadable:
+            return f"I found {unreadable} entry for {service}, sir, but couldn't decrypt it."
         return f"I don't have any credentials saved for {service}, sir."
-    if len(matches) == 1:
-        return matches[0]
-    return f"I found {len(matches)} entries for {service}, sir:\n" + "\n".join(matches)
+
+    result = matches[0] if len(matches) == 1 else f"I found {len(matches)} entries for {service}, sir:\n" + "\n".join(matches)
+    if unreadable:
+        result += f"\n({unreadable} other entry couldn't be decrypted.)"
+    return result
 
 
 def delete_password(service):
-    matches = [p for p in _fetch_entries() if p["service"].lower() == service.lower()]
+    entries = _fetch_entries()
+    if entries is None:
+        return CONNECTION_ERROR
 
+    matches = [p for p in entries if p["service"].lower() == service.lower()]
     if not matches:
         return f"I don't have any credentials saved for {service}, sir."
 
-    for entry in matches:
-        requests.post(f"{config.API_BASE}/delete-password", json={"id": entry["id"]}, timeout=10)
+    deleted = sum(1 for entry in matches if _post("/delete-password", {"id": entry["id"]}))
 
-    return f"Deleted {len(matches)} credential(s) for {service}, sir."
+    if deleted == 0:
+        return f"I couldn't delete the credentials for {service}, sir. Please try again."
+    if deleted < len(matches):
+        return f"Deleted {deleted} of {len(matches)} credential(s) for {service}, sir. Please try again for the rest."
+    return f"Deleted {deleted} credential(s) for {service}, sir."
 
 
 def list_password_services():
+    fernet = _get_fernet()
+    if fernet is None:
+        return LOCKED_ERROR
+
     entries = _fetch_entries()
+    if entries is None:
+        return CONNECTION_ERROR
     if not entries:
         return "You have no saved credentials, sir."
 
-    fernet = Fernet(security.get_master_key())
     lines = []
     for entry in entries:
-        data = json.loads(fernet.decrypt(entry["encrypted_data"].encode()).decode())
-        lines.append(f"{entry['service']} -- {data['username']}")
+        data = _decrypt(fernet, entry)
+        if data is None:
+            lines.append(f"{entry['service']} -- (couldn't be decrypted)")
+        else:
+            lines.append(f"{entry['service']} -- {data['username']}")
 
     return "Saved credentials:\n" + "\n".join(lines)
 

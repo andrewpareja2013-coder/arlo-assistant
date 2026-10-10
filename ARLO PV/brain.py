@@ -45,6 +45,14 @@ def _call_ai(messages, tools=None):
     return message, neurons
 
 
+def _record_usage(account_id, amount):
+    """Reports usage to the server. A failure here never blocks a reply."""
+    try:
+        requests.post(f"{config.API_BASE}/add-usage", json={"account_id": account_id, "amount": amount}, timeout=10)
+    except Exception:
+        pass
+
+
 def build_system_prompt(memory):
     greeting_word = get_greeting_word()
     today = get_date()
@@ -136,7 +144,10 @@ def run_tool(tool_name, tool_input, memory):
 
 def get_reply(user_message, memory):
     account_id = memory.account_id
-    usage_check = requests.get(f"{config.API_BASE}/check-usage", params={"account_id": account_id}, timeout=10).json()
+    try:
+        usage_check = requests.get(f"{config.API_BASE}/check-usage", params={"account_id": account_id}, timeout=10).json()
+    except Exception:
+        usage_check = {}  # if the check can't run, let the chat continue
 
     if not usage_check.get("allowed", True):
         return "I'm sorry sir, you've reached your daily usage limit. Please try again tomorrow."
@@ -152,6 +163,8 @@ def get_reply(user_message, memory):
         total_usage += used
     except Exception as e:
         report_error("E001", str(e))
+        if memory.conversation and memory.conversation[-1].get("role") == "user":
+            memory.conversation.pop()  # don't leave an unanswered message in the history
         return "I'm sorry sir, I'm having trouble reaching my AI model right now. Please try again."
 
     tool_calls = message.get("tool_calls")
@@ -163,7 +176,12 @@ def get_reply(user_message, memory):
         for call in tool_calls:
             tool_name = call["function"]["name"]
             raw_args = call["function"]["arguments"]
-            tool_input = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            try:
+                tool_input = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except Exception:
+                tool_input = {}
+            if not isinstance(tool_input, dict):
+                tool_input = {}
 
             tool_result = run_tool(tool_name, tool_input, memory)
 
@@ -180,7 +198,7 @@ def get_reply(user_message, memory):
             report_error("E001", str(e))
             reply_text = "I'm sorry sir, I completed the action but had trouble forming a response."
     else:
-        reply_text = message.get("content", "")
+        reply_text = message.get("content", "") or ""
 
     fake_call = _extract_fake_tool_call(reply_text)
     if fake_call:
@@ -190,7 +208,7 @@ def get_reply(user_message, memory):
 
     memory.add_message("assistant", reply_text)
 
-    requests.post(f"{config.API_BASE}/add-usage", json={"account_id": account_id, "amount": total_usage}, timeout=10)
+    _record_usage(account_id, total_usage)
 
     return reply_text
 
@@ -211,8 +229,8 @@ def update_long_term_memory(memory):
     )
     try:
         message, used = _call_ai([{"role": "user", "content": prompt}])
-        requests.post(f"{config.API_BASE}/add-usage", json={"account_id": memory.account_id, "amount": used}, timeout=10)
     except Exception as e:
         report_error("E001", str(e))
         return
-    memory.save_summary(message.get("content", ""))
+    _record_usage(memory.account_id, used)
+    memory.save_summary(message.get("content", "") or "")

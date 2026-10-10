@@ -14,11 +14,20 @@ ERROR_CODES = {
 }
 
 
+def _can_show_detail():
+    """Only admins and testers see the technical detail. Everyone else sees just the code."""
+    try:
+        import security
+        return security.can_see_debug()
+    except Exception:
+        return False
+
+
 def report_error(code, detail=""):
     """Prints a standardized error message and returns it for use as a reply."""
     description = ERROR_CODES.get(code, "Unknown error.")
     message = f"[ARLO-{code}] {description}"
-    if detail:
+    if detail and _can_show_detail():
         message += f" ({detail})"
     print(message)
     return message

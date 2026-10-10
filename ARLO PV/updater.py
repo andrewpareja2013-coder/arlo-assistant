@@ -49,10 +49,11 @@ def updates_enabled():
 
 
 def _get_local_version():
-    if not os.path.exists(LOCAL_VERSION_FILE):
+    try:
+        with open(LOCAL_VERSION_FILE) as f:
+            return str(json.load(f).get("version", "0.0.0"))
+    except Exception:
         return "0.0.0"
-    with open(LOCAL_VERSION_FILE) as f:
-        return json.load(f).get("version", "0.0.0")
 
 
 def _get_remote_version_info():
@@ -61,6 +62,14 @@ def _get_remote_version_info():
         return response.json()
     except Exception:
         return None
+
+
+def _version_tuple(text):
+    """Turns '1.2.3.1' into (1, 2, 3, 1) so versions compare as numbers. Bad text becomes (0,)."""
+    try:
+        return tuple(int(part) for part in str(text).strip().split("."))
+    except Exception:
+        return (0,)
 
 
 def _read_saved_settings():
@@ -159,6 +168,10 @@ def apply_update():
         zipfile.ZipFile(io.BytesIO(response.content)).extractall(extract_path)
         extracted_root = os.path.join(extract_path, "arlo-assistant-main", "ARLO PV")
 
+        # Stop before touching anything if the download isn't what we expect
+        if not os.path.isfile(os.path.join(extracted_root, "config.py")) or not os.path.isfile(os.path.join(extracted_root, "version.json")):
+            return False
+
         saved = _read_saved_settings()
         if os.path.exists(LOCAL_CONFIG_FILE):
             shutil.copy2(LOCAL_CONFIG_FILE, LOCAL_CONFIG_FILE + ".bak")
@@ -190,11 +203,11 @@ def check_for_update():
     local_version = _get_local_version()
     remote_info = _get_remote_version_info()
 
-    if remote_info is None:
+    if not isinstance(remote_info, dict):
         return None, False
 
-    remote_version = remote_info.get("version", local_version)
-    if remote_version == local_version:
+    remote_version = str(remote_info.get("version", local_version))
+    if _version_tuple(remote_version) <= _version_tuple(local_version):
         return None, False
 
     if remote_info.get("force"):

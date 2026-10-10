@@ -27,6 +27,28 @@ def _get_location():
         return lat, lon
 
 
+def _describe(code):
+    if code == 0:
+        return "clear skies"
+    if code == 1:
+        return "mostly clear"
+    if code == 2:
+        return "partly cloudy"
+    if code == 3:
+        return "overcast"
+    if code in (45, 48):
+        return "foggy"
+    if code in (51, 53, 55, 61, 63, 65, 80, 81, 82):
+        return "rainy"
+    if code in (56, 57, 66, 67):
+        return "freezing rain"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "snowy"
+    if code in (95, 96, 99):
+        return "stormy"
+    return "unclear conditions"
+
+
 def get_weather():
     lat, lon = _get_location()
     if lat is None or lon is None:
@@ -38,29 +60,16 @@ def get_weather():
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&current=temperature_2m,weather_code&temperature_unit={unit}"
     )
-    response = requests.get(url, timeout=5)
-    data = response.json()
-    temp = data["current"]["temperature_2m"]
-    code = data["current"]["weather_code"]
+    try:
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        temp = data["current"]["temperature_2m"]
+        code = data["current"]["weather_code"]
+    except Exception:
+        return "I couldn't get the weather right now, sir. Please check the connection and try again."
 
     unit_symbol = "°F" if unit == "fahrenheit" else "°C"
-
-    if code == 0:
-        condition = "clear skies"
-    elif code in [1, 2, 3]:
-        condition = "partly cloudy"
-    elif code in [45, 48]:
-        condition = "foggy"
-    elif code in [51, 53, 55, 61, 63, 65]:
-        condition = "rainy"
-    elif code in [71, 73, 75]:
-        condition = "snowy"
-    elif code in [95, 96, 99]:
-        condition = "stormy"
-    else:
-        condition = "unclear conditions"
-
-    return f"{temp}{unit_symbol} and {condition}"
+    return f"{temp}{unit_symbol} and {_describe(code)}"
 
 
 register(

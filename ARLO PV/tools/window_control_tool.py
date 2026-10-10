@@ -16,88 +16,113 @@ except Exception:
     gw = None
     _AVAILABLE = False
 
+# Each layout is (x, y, width, height) as fractions of the screen.
+LAYOUTS = {
+    "left": (0, 0, 2 / 3, 1),
+    "right": (2 / 3, 0, 1 / 3, 1),
+    "full": (0, 0, 1, 1),
+    "half-left": (0, 0, 1 / 2, 1),
+    "half-right": (1 / 2, 0, 1 / 2, 1),
+    "top-right-quarter": (1 / 2, 0, 1 / 2, 1 / 2),
+    "bottom-right-quarter": (1 / 2, 1 / 2, 1 / 2, 1 / 2),
+}
+
 
 def _find_window(title_part):
-    windows = gw.getAllWindows()
-    for w in windows:
-        if title_part.lower() in w.title.lower() and w.title.strip():
-            return w
+    title_part = str(title_part).lower().strip()
+    if not title_part:
+        return None
+    try:
+        for w in gw.getAllWindows():
+            if w.title.strip() and title_part in w.title.lower():
+                return w
+    except Exception:
+        return None
     return None
 
 
 def _get_screen_size():
-    import tkinter as tk
-    root = tk.Tk()
-    width = root.winfo_screenwidth()
-    height = root.winfo_screenheight()
-    root.destroy()
-    return width, height
+    import ctypes
+    user32 = ctypes.windll.user32
+    return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+
+
+def _activate(w):
+    """pygetwindow often raises an error even when activation worked, so errors are ignored."""
+    try:
+        w.activate()
+    except Exception:
+        pass
+
+
+def _not_found(app_name):
+    return f"I couldn't find an open window for {app_name}, sir."
+
+
+def _failed(action, app_name):
+    return f"I couldn't {action} {app_name}, sir."
 
 
 def minimize_window(app_name):
     w = _find_window(app_name)
     if not w:
-        return f"I couldn't find an open window for {app_name}, sir."
-    w.minimize()
+        return _not_found(app_name)
+    try:
+        w.minimize()
+    except Exception:
+        return _failed("minimize", app_name)
     return f"Minimized {app_name}, sir."
 
 
 def maximize_window(app_name):
     w = _find_window(app_name)
     if not w:
-        return f"I couldn't find an open window for {app_name}, sir."
-    if w.isMinimized:
-        w.restore()
-    w.activate()
-    w.maximize()
+        return _not_found(app_name)
+    try:
+        if w.isMinimized:
+            w.restore()
+        _activate(w)
+        w.maximize()
+    except Exception:
+        return _failed("maximize", app_name)
     return f"Maximized {app_name}, sir."
 
 
 def switch_to_window(app_name):
     w = _find_window(app_name)
     if not w:
-        return f"I couldn't find an open window for {app_name}, sir."
-    w.activate()
+        return _not_found(app_name)
+    try:
+        if w.isMinimized:
+            w.restore()
+    except Exception:
+        pass
+    _activate(w)
     return f"Switched to {app_name}, sir."
 
 
 def snap_window(app_name, position):
-    w = _find_window(app_name)
-    if not w:
-        return f"I couldn't find an open window for {app_name}, sir."
-
-    if w.isMinimized:
-        w.restore()
-    w.activate()
-
-    screen_w, screen_h = _get_screen_size()
-    position = position.lower().strip()
-
-    if position == "left":
-        w.moveTo(0, 0)
-        w.resizeTo(int(screen_w * 2 / 3), screen_h)
-    elif position == "right":
-        w.moveTo(int(screen_w * 2 / 3), 0)
-        w.resizeTo(int(screen_w * 1 / 3), screen_h)
-    elif position == "full":
-        w.moveTo(0, 0)
-        w.resizeTo(screen_w, screen_h)
-    elif position == "half-left":
-        w.moveTo(0, 0)
-        w.resizeTo(int(screen_w / 2), screen_h)
-    elif position == "half-right":
-        w.moveTo(int(screen_w / 2), 0)
-        w.resizeTo(int(screen_w / 2), screen_h)
-    elif position == "top-right-quarter":
-        w.moveTo(int(screen_w / 2), 0)
-        w.resizeTo(int(screen_w / 2), int(screen_h / 2))
-    elif position == "bottom-right-quarter":
-        w.moveTo(int(screen_w / 2), int(screen_h / 2))
-        w.resizeTo(int(screen_w / 2), int(screen_h / 2))
-    else:
+    layout_name = str(position).lower().strip().replace(" ", "-").replace("_", "-")
+    if layout_name not in LAYOUTS:
         return f"I don't recognize the layout '{position}', sir."
 
-    return f"Snapped {app_name} to {position}, sir."
+    w = _find_window(app_name)
+    if not w:
+        return _not_found(app_name)
+
+    try:
+        if w.isMinimized:
+            w.restore()
+        _activate(w)
+
+        screen_w, screen_h = _get_screen_size()
+        fx, fy, fw, fh = LAYOUTS[layout_name]
+        w.moveTo(int(screen_w * fx), int(screen_h * fy))
+        w.resizeTo(int(screen_w * fw), int(screen_h * fh))
+    except Exception:
+        return _failed("snap", app_name)
+
+    return f"Snapped {app_name} to {layout_name}, sir."
 
 
 if _AVAILABLE:

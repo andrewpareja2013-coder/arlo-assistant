@@ -17,6 +17,21 @@ def _uses_military_time():
     return security.get_setting("military_time", False)
 
 
+def _parse_clock_time(text):
+    """Turns '3:00 PM' or '3 PM' into a time object. Returns None if it can't be understood."""
+    cleaned = " ".join(str(text).upper().split())
+    for fmt in ("%I:%M %p", "%I %p", "%I:%M%p", "%I%p"):
+        try:
+            return datetime.strptime(cleaned, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _format_time(moment):
+    return moment.strftime("%H:%M") if _uses_military_time() else moment.strftime("%I:%M %p")
+
+
 def _match_alarm(memory, description):
     """Finds an alarm matching by description text OR by parsing the input as a time."""
     search = description.lower().strip()
@@ -76,19 +91,26 @@ def set_alarm(memory, minutes_from_now=None, seconds_from_now=None, clock_time=N
     elif clock_time is not None:
         if "am" not in clock_time.lower() and "pm" not in clock_time.lower():
             return f"Did you mean {clock_time} AM or {clock_time} PM, sir?"
-        fire_time = datetime.strptime(clock_time.upper(), "%I:%M %p")
-        fire_time = fire_time.replace(year=now.year, month=now.month, day=now.day)
+        parsed = _parse_clock_time(clock_time)
+        if parsed is None:
+            return f"I couldn't understand the time '{clock_time}', sir. Try something like '3:00 PM'."
+        fire_time = parsed.replace(year=now.year, month=now.month, day=now.day)
         if fire_time < now:
             fire_time += timedelta(days=1)
     else:
         return "I need a duration or a specific time to set an alarm, sir."
 
-    response = requests.post(
-        f"{config.API_BASE}/save-alarm",
-        json={"account_id": memory.account_id, "fire_time": fire_time.isoformat(), "description": description},
-        timeout=10,
-    )
-    new_id = response.json().get("id")
+    try:
+        response = requests.post(
+            f"{config.API_BASE}/save-alarm",
+            json={"account_id": memory.account_id, "fire_time": fire_time.isoformat(), "description": description},
+            timeout=10,
+        )
+        new_id = response.json().get("id")
+    except Exception:
+        return "I couldn't save that alarm, sir. Please check the connection and try again."
+    if new_id is None:
+        return "I couldn't save that alarm, sir. Please try again."
     memory.alarms.append({"id": new_id, "time": fire_time, "description": description, "fired": False})
 
     display = fire_time.strftime("%H:%M:%S") if _uses_military_time() else fire_time.strftime("%I:%M:%S %p")
@@ -100,11 +122,9 @@ def list_alarms(memory):
     if not active:
         return "You have no active alarms, sir."
 
-    military = _uses_military_time()
     lines = []
     for a in active:
-        display = a["time"].strftime("%H:%M") if military else a["time"].strftime("%I:%M %p")
-        lines.append(f"{display} -- {a['description']}")
+        lines.append(f"{_format_time(a['time'])} -- {a['description']}")
     return "Active alarms:\n" + "\n".join(lines)
 
 
@@ -137,18 +157,28 @@ def cancel_alarm(memory, description):
     if not a:
         return f"I couldn't find an active alarm matching '{description}', sir."
 
-    requests.post(f"{config.API_BASE}/delete-alarm", json={"id": a["id"]}, timeout=10)
+    try:
+        response = requests.post(f"{config.API_BASE}/delete-alarm", json={"id": a["id"]}, timeout=10)
+        confirmed = response.json().get("success", True)
+    except Exception:
+        confirmed = False
+    if not confirmed:
+        return "I couldn't cancel that alarm, sir. Please check the connection and try again."
+
     memory.alarms.remove(a)
-    return f"Cancelled the alarm for {a['time'].strftime('%I:%M %p')}, sir."
+    return f"Cancelled the alarm for {_format_time(a['time'])}, sir."
 
 
 def time_until(clock_time):
     if "am" not in clock_time.lower() and "pm" not in clock_time.lower():
         return f"Did you mean {clock_time} AM or {clock_time} PM, sir?"
 
+    parsed = _parse_clock_time(clock_time)
+    if parsed is None:
+        return f"I couldn't understand the time '{clock_time}', sir. Try something like '5:00 PM'."
+
     now = datetime.now()
-    target = datetime.strptime(clock_time.upper(), "%I:%M %p")
-    target = target.replace(year=now.year, month=now.month, day=now.day)
+    target = parsed.replace(year=now.year, month=now.month, day=now.day)
     if target < now:
         target += timedelta(days=1)
 

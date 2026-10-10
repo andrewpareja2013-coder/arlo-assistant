@@ -173,13 +173,16 @@ def change_password(account_id, old_password, new_password):
     new_password_key = _derive_key_from_password(new_password, salt_b64)
     locked_master_key = Fernet(new_password_key).encrypt(master_key).decode()
 
-    requests.post(f"{config.API_BASE}/update-password", json={
-        "account_id": normalize_code(account_id),
-        "salt": salt_b64,
-        "locked_master_key": locked_master_key,
-        "master_key_plain": master_key.decode(),
-    }, timeout=10)
-    return True
+    try:
+        response = requests.post(f"{config.API_BASE}/update-password", json={
+            "account_id": normalize_code(account_id),
+            "salt": salt_b64,
+            "locked_master_key": locked_master_key,
+            "master_key_plain": master_key.decode(),
+        }, timeout=10)
+        return bool(response.json().get("success"))
+    except Exception:
+        return False
 
 
 def delete_account(account_id):
@@ -221,7 +224,10 @@ def set_role(target, new_role, admin_code):
 # -------------------------------------------------------------
 
 def save_setting(key, value):
-    requests.post(f"{config.API_BASE}/save-setting", json={"account_id": _current_account_id, "key": key, "value": value}, timeout=10)
+    try:
+        requests.post(f"{config.API_BASE}/save-setting", json={"account_id": _current_account_id, "key": key, "value": value}, timeout=10)
+    except Exception:
+        pass
 
 
 def get_setting(key, default=None):

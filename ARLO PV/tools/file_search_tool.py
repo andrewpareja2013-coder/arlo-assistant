@@ -6,28 +6,47 @@
 # =============================================================
 
 import os
+import time
 from tools.registry import register
+
+MAX_RESULTS = 10
+MAX_SECONDS = 20
+SKIP_FOLDERS = {"appdata", "node_modules", "__pycache__", "site-packages", "$recycle.bin"}
 
 
 def search_files(filename):
+    search_words = str(filename).lower().split()
+    if not search_words:
+        return "What should I search for, sir?"
+
     search_path = os.path.expanduser("~")
-    search_words = filename.lower().split()
     matches = []
+    started = time.time()
+    timed_out = False
 
     for root, dirs, files in os.walk(search_path):
-        dirs[:] = [d for d in dirs if d.lower() != "appdata"]
+        dirs[:] = [d for d in dirs if d.lower() not in SKIP_FOLDERS and not d.startswith(".")]
 
         for name in dirs + files:
             name_lower = name.lower()
             if all(word in name_lower for word in search_words):
                 matches.append(os.path.join(root, name))
-        if len(matches) >= 10:
+
+        if len(matches) >= MAX_RESULTS:
+            break
+        if time.time() - started > MAX_SECONDS:
+            timed_out = True
             break
 
     if matches:
-        return "\n".join(matches[:10])
-    else:
-        return f"No files or folders found matching '{filename}', sir."
+        result = "\n".join(matches[:MAX_RESULTS])
+        if timed_out:
+            result += "\n\n(Search stopped early after 20 seconds, so there may be more.)"
+        return result
+
+    if timed_out:
+        return f"I searched for 20 seconds and found nothing matching '{filename}', sir. The search didn't cover everything."
+    return f"No files or folders found matching '{filename}', sir."
 
 
 register(

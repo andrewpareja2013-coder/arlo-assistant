@@ -8,6 +8,7 @@
 import sys
 import os
 import io
+from getpass import getpass
 import requests
 import config
 import security
@@ -47,7 +48,8 @@ def show_hub(memory):
         arlo_says("The HUB is restricted to admin accounts only, sir.")
         return
 
-    pre_hub_snapshot = sys.stdout.buffer.getvalue()
+    capture_on = hasattr(sys.stdout, "captured")
+    pre_hub_snapshot = sys.stdout.captured.getvalue() if capture_on else ""
 
     _clear()
 
@@ -57,7 +59,7 @@ def show_hub(memory):
     print("║" + title.center(width) + "║")
     print("╚" + "═" * width + "╝\n")
 
-    admin_secret = input("Admin secret (Enter to skip and see only your own account): ").strip()
+    admin_secret = getpass("Admin secret (Enter to skip and see only your own account): ").strip()
     accounts, note = _load_accounts(admin_secret)
 
     print(f"\n── Accounts ({len(accounts)}) ──")
@@ -82,14 +84,15 @@ def show_hub(memory):
 
         print(f"\n  {acct['username']} -- {len(transcript)} total messages")
         for msg in transcript[-3:]:
-            print(f"    [{msg['role']}] {msg['content'][:60]}")
+            print(f"    [{msg.get('role', '?')}] {str(msg.get('content', ''))[:60]}")
         if summary:
-            print(f"    Memory summary: {summary[:150]}")
+            print(f"    Memory summary: {str(summary)[:150]}")
     print()
 
     input("\nPress Enter to return...")
     _clear()
-    sys.stdout.real_stdout.write(pre_hub_snapshot)
-    sys.stdout.real_stdout.flush()
-    sys.stdout.buffer = io.StringIO(pre_hub_snapshot)
-    sys.stdout.buffer.seek(0, io.SEEK_END)
+    if capture_on:
+        sys.stdout.real_stdout.write(pre_hub_snapshot)
+        sys.stdout.real_stdout.flush()
+        sys.stdout.captured = io.StringIO(pre_hub_snapshot)
+        sys.stdout.captured.seek(0, io.SEEK_END)

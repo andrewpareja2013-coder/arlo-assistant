@@ -11,24 +11,41 @@ import requests
 import config
 from tools.registry import register
 
+MAX_WIDTH = 1600
+
 
 def see_screen(question):
-    screenshot = ImageGrab.grab()
+    try:
+        screenshot = ImageGrab.grab()
+    except Exception:
+        return "I couldn't capture the screen, sir. This computer may not support screenshots."
+
+    if screenshot.width > MAX_WIDTH:
+        new_height = round(screenshot.height * MAX_WIDTH / screenshot.width)
+        screenshot = screenshot.resize((MAX_WIDTH, new_height))
+
     buffer = BytesIO()
     screenshot.save(buffer, format="PNG")
-    image_bytes = buffer.getvalue()
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    image_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    response = requests.post(f"{config.API_BASE}/vision-chat", json={
-        "image": image_b64,
-        "prompt": question,
-    }, timeout=30)
-    data = response.json()
+    try:
+        response = requests.post(f"{config.API_BASE}/vision-chat", json={
+            "image": image_b64,
+            "prompt": question,
+        }, timeout=30)
+        data = response.json()
+    except Exception:
+        return "I couldn't reach the vision service, sir. Please check the connection and try again."
 
     if not data.get("success"):
         return f"I was unable to analyze the screen: {data.get('error', 'unknown error')}"
 
-    return data["response"].get("response", "I couldn't determine what's on screen.")
+    result = data.get("response")
+    if isinstance(result, dict):
+        return result.get("response", "I couldn't determine what's on screen.")
+    if isinstance(result, str) and result:
+        return result
+    return "I couldn't determine what's on screen."
 
 
 register(

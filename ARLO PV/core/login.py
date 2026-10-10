@@ -6,6 +6,8 @@
 # =============================================================
 
 import os
+import sys
+from getpass import getpass
 import config
 import security
 from security import local_accounts
@@ -69,8 +71,8 @@ def _create_account_flow(accounts):
     if not _warn_same_name(accounts, username):
         return False
 
-    password = input("  Create a password: ")
-    confirm = input("  Confirm password: ")
+    password = getpass("  Create a password: ")
+    confirm = getpass("  Confirm password: ")
     if password != confirm or password.strip() == "":
         print("\n  Passwords didn't match or were empty. Try again.")
         _pause()
@@ -201,7 +203,7 @@ def login():
 
         if choice == "":
             _clear()
-            exit()
+            sys.exit()
 
         elif choice.lower() == "n":
             if _create_account_flow(accounts):
@@ -219,7 +221,7 @@ def login():
 
         elif choice.isdigit() and 1 <= int(choice) <= len(accounts):
             entry = accounts[int(choice) - 1]
-            password = input(f"  Password for {entry['name']}: ")
+            password = getpass(f"  Password for {entry['name']}: ")
             if security.unlock(entry["id"], password):
                 print(f"\n  Welcome back, {entry['name']}.")
                 _pause()
