@@ -1,5 +1,5 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "force": true,
-  "notes": "System updates and bug fixes."
+  "notes": "Fixed password prompts: passwords now show * as you type, and pasting works. Also includes the 1.2.4 stability fixes (alarms, weather, tools, and installer)."
 }

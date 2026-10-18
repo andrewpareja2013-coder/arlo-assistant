@@ -7,7 +7,7 @@
 
 import os
 import sys
-from getpass import getpass
+from custom_input import masked_input
 import config
 import security
 from security import local_accounts
@@ -71,8 +71,8 @@ def _create_account_flow(accounts):
     if not _warn_same_name(accounts, username):
         return False
 
-    password = getpass("  Create a password: ")
-    confirm = getpass("  Confirm password: ")
+    password = masked_input("  Create a password: ")
+    confirm = masked_input("  Confirm password: ")
     if password != confirm or password.strip() == "":
         print("\n  Passwords didn't match or were empty. Try again.")
         _pause()
@@ -221,7 +221,7 @@ def login():
 
         elif choice.isdigit() and 1 <= int(choice) <= len(accounts):
             entry = accounts[int(choice) - 1]
-            password = getpass(f"  Password for {entry['name']}: ")
+            password = masked_input(f"  Password for {entry['name']}: ")
             if security.unlock(entry["id"], password):
                 print(f"\n  Welcome back, {entry['name']}.")
                 _pause()

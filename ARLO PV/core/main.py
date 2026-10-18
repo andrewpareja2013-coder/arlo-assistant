@@ -12,7 +12,7 @@ import updater
 import textwrap
 import threading
 import requests
-from getpass import getpass
+from custom_input import masked_input
 from datetime import datetime
 from memory import Memory
 from brain import get_reply, update_long_term_memory
@@ -207,9 +207,9 @@ def run_session():
             continue
 
         if user_input == "/changepassword":
-            old = getpass("Current password: ")
-            new = getpass("New password: ")
-            confirm = getpass("Confirm new password: ")
+            old = masked_input("Current password: ")
+            new = masked_input("New password: ")
+            confirm = masked_input("Confirm new password: ")
             if new != confirm:
                 arlo_says("New passwords didn't match, sir.")
             elif security.change_password(memory.account_id, old, new):
@@ -222,7 +222,7 @@ def run_session():
         if user_input == "/setrole":
             target = input("Account code or username to change: ").strip()
             new_role = input("New role (admin/tester/regular): ").strip().lower()
-            admin_code = getpass("Admin code: ").strip()
+            admin_code = masked_input("Admin code: ").strip()
             success, error = security.set_role(target, new_role, admin_code)
             if success:
                 arlo_says(f"'{target}' is now set to '{new_role}', sir.")

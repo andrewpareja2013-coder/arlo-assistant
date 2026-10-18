@@ -8,7 +8,7 @@
 import sys
 import os
 import io
-from getpass import getpass
+from custom_input import masked_input
 import requests
 import config
 import security
@@ -59,7 +59,7 @@ def show_hub(memory):
     print("║" + title.center(width) + "║")
     print("╚" + "═" * width + "╝\n")
 
-    admin_secret = getpass("Admin secret (Enter to skip and see only your own account): ").strip()
+    admin_secret = masked_input("Admin secret (Enter to skip and see only your own account): ").strip()
     accounts, note = _load_accounts(admin_secret)
 
     print(f"\n── Accounts ({len(accounts)}) ──")
